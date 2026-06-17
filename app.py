@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for
 from flask_mysqldb import MySQL
 from dotenv import load_dotenv
 import boto3
+from botocore.config import Config
 from werkzeug.utils import secure_filename
 
 load_dotenv()
@@ -23,7 +24,21 @@ mysql = MySQL(app)
 # S3 Configuration — credentials come from EC2 IAM role automatically
 S3_BUCKET = os.getenv('S3_BUCKET')
 AWS_REGION = os.getenv('AWS_REGION', 'ap-south-1')
-s3 = boto3.client('s3', region_name=AWS_REGION)
+
+# Resolve the bucket's actual region, then build the client with SigV4 + virtual-hosted style
+# SigV4 + virtual-hosted style is required for presigned URLs on non-us-east-1 buckets
+_s3_probe = boto3.client('s3', region_name='us-east-1')
+try:
+    _loc = _s3_probe.get_bucket_location(Bucket=S3_BUCKET)
+    AWS_REGION = _loc['LocationConstraint'] or 'us-east-1'
+except Exception:
+    pass  # fall back to env value
+
+_s3_config = Config(
+    signature_version='s3v4',
+    s3={'addressing_style': 'virtual'}
+)
+s3 = boto3.client('s3', region_name=AWS_REGION, config=_s3_config)
 
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 ALLOWED_RESUME_EXTENSIONS = {'pdf', 'doc', 'docx'}
