@@ -39,7 +39,8 @@ def allowed_resume(filename):
 
 def upload_to_s3(file, folder):
     key = f"{folder}/{uuid.uuid4().hex}_{secure_filename(file.filename)}"
-    s3.upload_fileobj(file, S3_BUCKET, key, ExtraArgs={'ContentType': file.content_type})
+    content_type = file.content_type or 'application/octet-stream'
+    s3.upload_fileobj(file, S3_BUCKET, key, ExtraArgs={'ContentType': content_type})
     return key
 
 
